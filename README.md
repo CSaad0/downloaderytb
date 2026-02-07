@@ -5,8 +5,11 @@ Descrição
 
 Principais características
 - Interface limpa e responsiva para colar o link do YouTube e iniciar o download.
+
 - Conversão em tempo real usando `ytdl-core` e `ffmpeg`.
+
 - Fallback automático para `yt-dlp` (ou `npx yt-dlp`) quando o `ytdl-core` não consegue extrair os dados do player.
+
 - Tratamento de erros, timeouts e desconexões do cliente.
 
 Como usar localmente
@@ -47,5 +50,6 @@ git push -u origin main
 
 Observações
 - O servidor usa `ytdl-core` + `ffmpeg`. Se `ytdl-core` falhar ao extrair, há fallback que usa `yt-dlp` (ou `npx yt-dlp`).
-- Não hospede conteúdos protegidos por direitos autorais sem permissão.
+
+- Não hospede e nem faça downloads de conteúdos protegidos por direitos autorais sem permissão esse projeto foi criado com finalidade de estudos da programação.
 

@@ -8,27 +8,60 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <style>
         body {
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            min-height: 100vh;
+            background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+            height: 100vh;
             margin: 0;
+            padding: 0;
             font-family: 'Segoe UI', Arial, sans-serif;
             display: flex;
             align-items: center;
             justify-content: center;
+            animation: gradientShift 15s ease infinite;
+            overflow: hidden;
+        }
+        @keyframes gradientShift {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.05); }
         }
         .container {
             background: #fff;
-            padding: 32px 28px 24px 28px;
-            border-radius: 16px;
-            box-shadow: 0 8px 32px rgba(30,60,114,0.2);
+            padding: 40px 36px 32px 36px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 60px rgba(44, 83, 100, 0.1);
             max-width: 400px;
             width: 100%;
             text-align: center;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.95);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            margin: 0 auto;
+        }
+        .container::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(44, 83, 100, 0.1) 0%, transparent 70%);
+            pointer-events: none;
+            animation: glow 6s ease-in-out infinite;
+        }
+        @keyframes glow {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(10px, 10px) scale(1.05); }
         }
         h1 {
-            color: #1e3c72;
-            margin-bottom: 18px;
-            font-size: 1.5rem;
+            color: #0f2027;
+            margin-bottom: 24px;
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #0f2027 0%, #2c5364 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
         input[type="text"] {
             width: 100%;
@@ -38,13 +71,16 @@
             font-size: 1rem;
             margin-bottom: 16px;
             transition: border 0.2s;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         }
         input[type="text"]:focus {
-            border: 1.5px solid #2a5298;
+            border: 2px solid #2c5364;
             outline: none;
+            box-shadow: 0 8px 24px rgba(44, 83, 100, 0.15);
+            transform: translateY(-2px);
         }
         button {
-            background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%);
+            background: linear-gradient(135deg, #2c5364 0%, #0f2027 100%);
             color: #fff;
             border: none;
             border-radius: 8px;
@@ -53,35 +89,141 @@
             font-size: 1.1rem;
             font-weight: bold;
             cursor: pointer;
-            box-shadow: 0 2px 8px rgba(30,60,114,0.08);
-            transition: background 0.2s, transform 0.1s;
+            box-shadow: 0 8px 20px rgba(44, 83, 100, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        button:active::before {
+            width: 300px;
+            height: 300px;
         }
         button:hover {
-            background: linear-gradient(90deg, #2a5298 0%, #1e3c72 100%);
-            transform: translateY(-2px) scale(1.03);
+            background: linear-gradient(135deg, #0f2027 0%, #2c5364 100%);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 32px rgba(44, 83, 100, 0.4);
         }
         #mensagem {
             margin-top: 18px;
             color: #d32f2f;
             min-height: 22px;
             font-size: 1rem;
+            animation: slideIn 0.4s ease;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .mensagem-sucesso {
+            color: #1976d2 !important;
+            font-weight: 500;
+        }
+        .mensagem-erro {
+            color: #d32f2f !important;
+            font-weight: 500;
         }
         @media (max-width: 500px) {
             .container {
-                padding: 18px 8px 16px 8px;
-                max-width: 98vw;
+                padding: 24px 16px 20px 16px;
+                max-width: 96vw;
+                border-radius: 16px;
             }
             h1 {
-                font-size: 1.1rem;
+                font-size: 1.3rem;
+                margin-bottom: 16px;
+            }
+            .header {
+                flex-direction: column;
+                gap: 8px;
+                margin-bottom: 16px;
+            }
+            input[type="text"] {
+                padding: 11px;
+                font-size: 0.95rem;
+                margin-bottom: 12px;
+            }
+            button {
+                padding: 11px 0;
+                font-size: 1rem;
+            }
+            .footer {
+                margin-top: 16px;
+                font-size: 0.8rem;
             }
         }
         /* Novos estilos */
-        .header { display:flex; align-items:center; gap:12px; justify-content:center; margin-bottom:8px }
-        .logo { width:44px; height:44px }
-        .footer { margin-top:14px; color:#607d8b }
-        .footer a { color:#1e3c72; text-decoration:none; font-weight:600 }
-        .container { transition: transform 0.18s ease, box-shadow 0.18s ease }
-        .container:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(30,60,114,0.18) }
+        .header { 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+            justify-content: center; 
+            margin-bottom: 8px;
+            animation: float 3s ease-in-out infinite;
+        }
+        .logo { 
+            width: 44px; 
+            height: 44px;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+        }
+        .footer { 
+            margin-top: 24px; 
+            color: rgba(15, 32, 39, 0.6);
+            font-size: 0.85rem;
+            border-top: 1px solid rgba(15, 32, 39, 0.1);
+            padding-top: 16px;
+        }
+        .footer a { 
+            color: #2c5364; 
+            text-decoration: none; 
+            font-weight: 600;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .footer a::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: #2c5364;
+            transition: width 0.3s ease;
+        }
+        .footer a:hover {
+            color: #0f2027;
+            text-shadow: 0 0 8px rgba(44, 83, 100, 0.2);
+        }
+        .footer a:hover::after {
+            width: 100%;
+        }
+        .container { 
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        .container:hover { 
+            transform: translateY(-6px); 
+            box-shadow: 0 24px 48px rgba(44, 83, 100, 0.2);
+        }
     </style>
 </head>
 <body>
@@ -101,10 +243,10 @@
         async function baixar() {
             const url = document.getElementById('youtubeUrl').value;
             const mensagem = document.getElementById('mensagem');
-            mensagem.style.color = '#1e3c72';
+            mensagem.className = '';
             mensagem.textContent = '';
             if (!url) {
-                mensagem.style.color = '#d32f2f';
+                mensagem.className = 'mensagem-erro';
                 mensagem.textContent = 'Por favor, insira o link do YouTube.';
                 return;
             }
@@ -117,7 +259,7 @@
                 });
                 if (!response.ok) {
                     const erro = await response.json().catch(() => ({}));
-                    mensagem.style.color = '#d32f2f';
+                    mensagem.className = 'mensagem-erro';
                     mensagem.textContent = erro.error || 'Erro ao baixar o áudio.';
                     return;
                 }
@@ -128,10 +270,10 @@
                 document.body.appendChild(link);
                 link.click();
                 link.remove();
-                mensagem.style.color = '#388e3c';
-                mensagem.textContent = 'Download iniciado!';
+                mensagem.className = 'mensagem-sucesso';
+                mensagem.textContent = '✓ Download iniciado com sucesso!';
             } catch (e) {
-                mensagem.style.color = '#d32f2f';
+                mensagem.className = 'mensagem-erro';
                 mensagem.textContent = 'Erro ao conectar ao servidor.';
             }
         }
