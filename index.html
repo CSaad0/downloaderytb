@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Baixar Música do YouTube em MP3</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#1e3c72">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <style>
+        body {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            margin: 0;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: #fff;
+            padding: 32px 28px 24px 28px;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(30,60,114,0.2);
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 {
+            color: #1e3c72;
+            margin-bottom: 18px;
+            font-size: 1.5rem;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #b0bec5;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin-bottom: 16px;
+            transition: border 0.2s;
+        }
+        input[type="text"]:focus {
+            border: 1.5px solid #2a5298;
+            outline: none;
+        }
+        button {
+            background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 0;
+            width: 100%;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(30,60,114,0.08);
+            transition: background 0.2s, transform 0.1s;
+        }
+        button:hover {
+            background: linear-gradient(90deg, #2a5298 0%, #1e3c72 100%);
+            transform: translateY(-2px) scale(1.03);
+        }
+        #mensagem {
+            margin-top: 18px;
+            color: #d32f2f;
+            min-height: 22px;
+            font-size: 1rem;
+        }
+        @media (max-width: 500px) {
+            .container {
+                padding: 18px 8px 16px 8px;
+                max-width: 98vw;
+            }
+            h1 {
+                font-size: 1.1rem;
+            }
+        }
+        /* Novos estilos */
+        .header { display:flex; align-items:center; gap:12px; justify-content:center; margin-bottom:8px }
+        .logo { width:44px; height:44px }
+        .footer { margin-top:14px; color:#607d8b }
+        .footer a { color:#1e3c72; text-decoration:none; font-weight:600 }
+        .container { transition: transform 0.18s ease, box-shadow 0.18s ease }
+        .container:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(30,60,114,0.18) }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <img src="/favicon.svg" alt="logo" class="logo">
+            <h1>Baixar Música do YouTube em MP3</h1>
+        </header>
+        <input type="text" id="youtubeUrl" placeholder="Cole o link do YouTube aqui">
+        <button onclick="baixar()">Baixar MP3</button>
+        <div id="mensagem"></div>
+        <footer class="footer">
+            <small>Projeto local — use com responsabilidade. <a href="#" id="repoLink">Publicar no GitHub</a></small>
+        </footer>
+    </div>
+    <script>
+        async function baixar() {
+            const url = document.getElementById('youtubeUrl').value;
+            const mensagem = document.getElementById('mensagem');
+            mensagem.style.color = '#1e3c72';
+            mensagem.textContent = '';
+            if (!url) {
+                mensagem.style.color = '#d32f2f';
+                mensagem.textContent = 'Por favor, insira o link do YouTube.';
+                return;
+            }
+            mensagem.textContent = 'Processando...';
+            try {
+                const response = await fetch('/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+                if (!response.ok) {
+                    const erro = await response.json().catch(() => ({}));
+                    mensagem.style.color = '#d32f2f';
+                    mensagem.textContent = erro.error || 'Erro ao baixar o áudio.';
+                    return;
+                }
+                const blob = await response.blob();
+                const link = document.createElement('a');
+                link.href = window.URL.createObjectURL(blob);
+                link.download = 'audio.mp3';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                mensagem.style.color = '#388e3c';
+                mensagem.textContent = 'Download iniciado!';
+            } catch (e) {
+                mensagem.style.color = '#d32f2f';
+                mensagem.textContent = 'Erro ao conectar ao servidor.';
+            }
+        }
+    </script>
+</body>
+</html>
