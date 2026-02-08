@@ -27,6 +27,57 @@ const app = express();
 
 ffmpeg.setFfmpegPath(ffmpegPath);
 
+// Parser robusto para saída do yt-dlp (JSON único ou múltiplos objetos)
+function parseYtDlpPlaylistOutput(rawOutput) {
+    const cleanOutput = (rawOutput || '').trim();
+    if (!cleanOutput) {
+        throw new Error('Saída vazia do yt-dlp');
+    }
+
+    // Tentar JSON único primeiro
+    try {
+        const data = JSON.parse(cleanOutput);
+        if (data && Array.isArray(data.entries)) {
+            return data;
+        }
+        return { entries: Array.isArray(data) ? data : [data] };
+    } catch {
+        // Seguir para extração de múltiplos objetos
+    }
+
+    const objects = [];
+    let depth = 0;
+    let start = -1;
+    for (let i = 0; i < cleanOutput.length; i++) {
+        const ch = cleanOutput[i];
+        if (ch === '{') {
+            if (depth === 0) start = i;
+            depth++;
+        } else if (ch === '}') {
+            depth--;
+            if (depth === 0 && start !== -1) {
+                const chunk = cleanOutput.slice(start, i + 1);
+                try {
+                    objects.push(JSON.parse(chunk));
+                } catch {
+                    // ignora chunk inválido
+                }
+                start = -1;
+            }
+        }
+    }
+
+    if (objects.length === 1 && objects[0] && Array.isArray(objects[0].entries)) {
+        return objects[0];
+    }
+
+    if (objects.length > 0) {
+        return { entries: objects };
+    }
+
+    throw new Error('Nenhum JSON válido encontrado na saída do yt-dlp');
+}
+
 // CORS para qualquer origem
 app.use(cors({ origin: '*' }));
 app.use(express.json());
@@ -106,24 +157,8 @@ async function getPlaylistInfo(url) {
                         cleanOutput = cleanOutput.substring(jsonStart);
                     }
 
-                    // Primeiro tenta JSON único
-                    try {
-                        const data = JSON.parse(cleanOutput);
-                        return resolve(data);
-                    } catch (parseErr) {
-                        // Fallback: JSON por linha
-                        const entries = [];
-                        const lines = cleanOutput.split('\n').filter(Boolean);
-                        for (const line of lines) {
-                            try {
-                                entries.push(JSON.parse(line));
-                            } catch {}
-                        }
-                        if (entries.length > 0) {
-                            return resolve({ entries });
-                        }
-                        throw parseErr;
-                    }
+                    const parsed = parseYtDlpPlaylistOutput(cleanOutput);
+                    return resolve(parsed);
                 } catch (e) {
                     reject(new Error('Erro ao fazer parse JSON da playlist'));
                 }
@@ -147,21 +182,8 @@ async function getPlaylistInfo(url) {
                                 cleanOutput = cleanOutput.substring(jsonStart);
                             }
 
-                            try {
-                                return resolve(JSON.parse(cleanOutput));
-                            } catch (parseErr) {
-                                const entries = [];
-                                const lines = cleanOutput.split('\n').filter(Boolean);
-                                for (const line of lines) {
-                                    try {
-                                        entries.push(JSON.parse(line));
-                                    } catch {}
-                                }
-                                if (entries.length > 0) {
-                                    return resolve({ entries });
-                                }
-                                throw parseErr;
-                            }
+                            const parsed = parseYtDlpPlaylistOutput(cleanOutput);
+                            return resolve(parsed);
                         } catch (e) {
                             reject(new Error('Erro ao fazer parse JSON'));
                         }
