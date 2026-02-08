@@ -139,7 +139,22 @@ async function downloadAudio(url, isPlaylist = false) {
 
 // Função para obter informações de uma playlist
 async function getPlaylistInfo(url) {
-    const args = [url, '--dump-single-json', '--flat-playlist'];
+    const baseArgs = ['--flat-playlist', '--no-warnings', '--no-call-home', '--skip-download'];
+    const primaryArgs = [url, '--dump-single-json', ...baseArgs];
+    const fallbackArgs = [url, '--dump-json', ...baseArgs];
+
+    const output = await runYtDlp(primaryArgs);
+    const parsedPrimary = tryParsePlaylistOutput(output);
+    if (parsedPrimary) return parsedPrimary;
+
+    const outputFallback = await runYtDlp(fallbackArgs);
+    const parsedFallback = tryParsePlaylistOutput(outputFallback);
+    if (parsedFallback) return parsedFallback;
+
+    throw new Error('Erro ao fazer parse JSON da playlist');
+}
+
+async function runYtDlp(args) {
     return new Promise((resolve, reject) => {
         let output = '';
         const proc = spawn('yt-dlp', args, { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -148,54 +163,38 @@ async function getPlaylistInfo(url) {
         proc.stderr.on('data', (data) => { console.error('[yt-dlp]', data.toString().trim()); });
 
         proc.on('close', (code) => {
-            if (code === 0) {
-                try {
-                    // Limpar possíveis mensagens de erro antes do JSON
-                    let cleanOutput = output.trim();
-                    const jsonStart = cleanOutput.indexOf('{');
-                    if (jsonStart > 0) {
-                        cleanOutput = cleanOutput.substring(jsonStart);
-                    }
-
-                    const parsed = parseYtDlpPlaylistOutput(cleanOutput);
-                    return resolve(parsed);
-                } catch (e) {
-                    reject(new Error('Erro ao fazer parse JSON da playlist'));
-                }
-            } else {
-                reject(new Error('Erro ao obter info da playlist'));
-            }
+            if (code === 0) return resolve(output);
+            return reject(new Error('Erro ao obter info da playlist'));
         });
 
         proc.on('error', (err) => {
             if (err.code === 'ENOENT') {
-                // Tentar com npx
                 const proc2 = spawn('npx', ['yt-dlp', ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
                 let output2 = '';
                 proc2.stdout.on('data', (data) => { output2 += data.toString(); });
+                proc2.stderr.on('data', (data) => { console.error('[yt-dlp]', data.toString().trim()); });
                 proc2.on('close', (code) => {
-                    if (code === 0) {
-                        try {
-                            let cleanOutput = output2.trim();
-                            const jsonStart = cleanOutput.indexOf('{');
-                            if (jsonStart > 0) {
-                                cleanOutput = cleanOutput.substring(jsonStart);
-                            }
-
-                            const parsed = parseYtDlpPlaylistOutput(cleanOutput);
-                            return resolve(parsed);
-                        } catch (e) {
-                            reject(new Error('Erro ao fazer parse JSON'));
-                        }
-                    } else {
-                        reject(err);
-                    }
+                    if (code === 0) return resolve(output2);
+                    return reject(new Error('Erro ao obter info da playlist'));
                 });
             } else {
-                reject(err);
+                return reject(err);
             }
         });
     });
+}
+
+function tryParsePlaylistOutput(output) {
+    try {
+        let cleanOutput = (output || '').trim();
+        const jsonStart = cleanOutput.indexOf('{');
+        if (jsonStart > 0) {
+            cleanOutput = cleanOutput.substring(jsonStart);
+        }
+        return parseYtDlpPlaylistOutput(cleanOutput);
+    } catch {
+        return null;
+    }
 }
 
 app.post('/download', async (req, res) => {
