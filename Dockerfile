@@ -1,5 +1,5 @@
 # Use Node.js 18 como base
-FROM node:18-alpine
+FROM node:18-bullseye
 
 # Define diretório de trabalho
 WORKDIR /app
@@ -11,9 +11,11 @@ COPY package*.json ./
 RUN npm install --production && \
     npm install ffmpeg-static
 
-# Instalar yt-dlp (necessário para fallback)
-RUN apk add --no-cache python3 py3-pip && \
-    pip3 install yt-dlp
+# Instalar ffmpeg e yt-dlp (necessário para fallback)
+RUN apt-get update && \
+    apt-get install -y ffmpeg python3-pip && \
+    pip3 install yt-dlp && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copiar arquivo do servidor
 COPY server.js .
