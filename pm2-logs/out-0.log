@@ -1,0 +1,26 @@
+Servidor rodando na porta 3000
+Servidor rodando na porta 3000
+[2026-02-07T15:32:18.451Z] GET /
+[2026-02-07T15:32:19.120Z] GET /favicon.svg
+[2026-02-07T15:32:19.233Z] GET /favicon.svg
+[2026-02-07T15:32:27.810Z] GET /
+[2026-02-07T15:32:27.919Z] GET /favicon.svg
+[2026-02-07T15:32:28.068Z] GET /favicon.svg
+[2026-02-07T15:33:49.720Z] POST /download
+Recebido POST /download: {
+  url: 'https://www.youtube.com/watch?v=xoc0DX_Q_Cg&list=RDEMtufwU4LiiXOo7Df_x-PH1w&start_radio=1'
+}
+getInfo falhou com problema de extração; tentando fallback com yt-dlp...
+yt-dlp finalizado com sucesso.
+[2026-02-07T15:34:13.518Z] POST /download
+Recebido POST /download: {
+  url: 'https://www.youtube.com/watch?v=xoc0DX_Q_Cg&list=RDEMtufwU4LiiXOo7Df_x-PH1w&start_radio=1'
+}
+getInfo falhou com problema de extração; tentando fallback com yt-dlp...
+[2026-02-07T15:35:00.534Z] POST /download
+Recebido POST /download: { url: 'https://www.youtube.com/watch?v=aMgyP1DaVQk' }
+getInfo falhou com problema de extração; tentando fallback com yt-dlp...
+[2026-02-07T15:35:22.298Z] GET /
+[2026-02-07T15:35:24.493Z] GET /favicon.svg
+[2026-02-07T15:35:27.205Z] GET /favicon.svg
+🚀 Servidor rodando na porta 3000

@@ -8,13 +8,19 @@
   },
   "scripts": {
     "start": "node server.js",
-    "postinstall": "npm install express ytdl-core fluent-ffmpeg @ffmpeg-installer/ffmpeg cors"
+    "start:24h": "node start-pm2.js",
+    "logs": "pm2 logs youtube-downloader",
+    "stop": "pm2 stop youtube-downloader",
+    "restart": "pm2 restart youtube-downloader",
+    "status": "pm2 status",
+    "postinstall": "npm install express ytdl-core fluent-ffmpeg @ffmpeg-installer/ffmpeg cors archiver"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "cors": "^2.8.6",
     "express": "^4.22.1",
     "fluent-ffmpeg": "^2.1.3",
+    "pm2": "^6.0.14",
     "ytdl-core": "^4.11.5"
   }
 }

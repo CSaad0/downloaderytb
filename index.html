@@ -10,6 +10,7 @@
         body {
             background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
             height: 100vh;
+            width: 100vw;
             margin: 0;
             padding: 0;
             font-family: 'Segoe UI', Arial, sans-serif;
@@ -18,6 +19,7 @@
             justify-content: center;
             animation: gradientShift 15s ease infinite;
             overflow: hidden;
+            box-sizing: border-box;
         }
         @keyframes gradientShift {
             0%, 100% { filter: brightness(1); }
@@ -29,13 +31,13 @@
             border-radius: 20px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 60px rgba(44, 83, 100, 0.1);
             max-width: 400px;
-            width: 100%;
+            width: calc(100% - 32px);
             text-align: center;
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.95);
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
-            margin: 0 auto;
+            flex-shrink: 0;
         }
         .container::before {
             content: '';
@@ -65,13 +67,16 @@
         }
         input[type="text"] {
             width: 100%;
+            max-width: 100%;
             padding: 12px;
             border: 1px solid #b0bec5;
             border-radius: 8px;
             font-size: 1rem;
-            margin-bottom: 16px;
+            margin: 0 auto 16px auto;
             transition: border 0.2s;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            display: block;
+            box-sizing: border-box;
         }
         input[type="text"]:focus {
             border: 2px solid #2c5364;
@@ -250,7 +255,7 @@
                 mensagem.textContent = 'Por favor, insira o link do YouTube.';
                 return;
             }
-            mensagem.textContent = 'Processando...';
+            mensagem.textContent = '🔍 Verificando link...';
             try {
                 const response = await fetch('/download', {
                     method: 'POST',
@@ -263,15 +268,27 @@
                     mensagem.textContent = erro.error || 'Erro ao baixar o áudio.';
                     return;
                 }
+                mensagem.textContent = '⬇️ Baixando áudio...';
                 const blob = await response.blob();
                 const link = document.createElement('a');
                 link.href = window.URL.createObjectURL(blob);
-                link.download = 'audio.mp3';
+                
+                // Extrair nome do arquivo do header Content-Disposition
+                const contentDisposition = response.headers.get('content-disposition');
+                let filename = 'audio.mp3';
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+                    if (filenameMatch) {
+                        filename = filenameMatch[1];
+                    }
+                }
+                
+                link.download = filename;
                 document.body.appendChild(link);
                 link.click();
                 link.remove();
                 mensagem.className = 'mensagem-sucesso';
-                mensagem.textContent = '✓ Download iniciado com sucesso!';
+                mensagem.textContent = `✓ Download concluído: ${filename}`;
             } catch (e) {
                 mensagem.className = 'mensagem-erro';
                 mensagem.textContent = 'Erro ao conectar ao servidor.';

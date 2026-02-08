@@ -1,32 +1,86 @@
-# SITE PARA BAIXAR MUSICAS
+# 🎵 YouTube para MP3 - Downloader
 
-Descrição
-- Projeto simples em Node.js que permite converter o áudio de vídeos do YouTube para MP3 através de uma interface web leve. A aplicação aceita um link do YouTube, processa o stream do áudio e disponibiliza o download em MP3.
+Aplicação Node.js para baixar músicas do YouTube em MP3 e playlists em ZIP.
 
-Principais características
-- Interface limpa e responsiva para colar o link do YouTube e iniciar o download.
-
-- Conversão em tempo real usando `ytdl-core` e `ffmpeg`.
-
-- Fallback automático para `yt-dlp` (ou `npx yt-dlp`) quando o `ytdl-core` não consegue extrair os dados do player.
-
-- Tratamento de erros, timeouts e desconexões do cliente.
-
-Como usar localmente
-
-1. Instale dependências:
+## 🚀 Instalação
 
 ```bash
 npm install
 ```
 
-2. Inicie o servidor:
+## 📍 Modo Normal (Teste)
+
+Para rodar o servidor normalmente:
 
 ```bash
-node server.js
+npm start
 ```
 
-3. Abra no navegador: `http://localhost:3000` e cole o link do YouTube.
+Acesse: http://localhost:3000
+
+## ⏰ Modo 24 Horas (Produção)
+
+Para rodar o servidor **24 horas continuamente**:
+
+```bash
+npm run start:24h
+```
+
+### 📋 Comandos PM2
+
+- **Ver status**: `npm run status`
+- **Ver logs**: `npm run logs`
+- **Pausar**: `npm run stop`
+- **Reiniciar**: `npm run restart`
+
+## 📥 Como Usar
+
+### Vídeo Individual
+- Cole o link do YouTube
+- Clique em "Baixar MP3"
+- Arquivo com nome original será baixado
+
+### Playlist
+- Cole a URL da playlist (com `list=`)
+- Clique em "Baixar MP3"
+- Baixa até 50 músicas em `playlist.zip`
+
+## 📦 Características
+
+- ✅ Suporte a vídeos e playlists
+- ✅ Conversão em tempo real para MP3 (128kbps)
+- ✅ Fallback automático com yt-dlp
+- ✅ Funciona 24/7 com PM2
+- ✅ Interface bonita e responsiva
+- ✅ Nomes originais dos arquivos
+
+## ⚙️ PM2 - Configuração 24h
+
+O PM2 está pronto para:
+- ✅ Reiniciar se o servidor cair
+- ✅ Limitar memória: 500MB
+- ✅ Salvar logs automaticamente
+- ✅ Rodar continuamente sem parar
+
+## 🔧 Troubleshooting
+
+**Porta 3000 em uso?**
+```bash
+netstat -ano | findstr :3000
+taskkill /PID <PID> /F
+```
+
+**Ver erros?**
+```bash
+npm run logs
+```
+
+## 📝 Notas
+
+- Respeite direitos autorais
+- Máx. 50 músicas por playlist
+- Timeout: 5min playlists, 1min vídeos
+- Requer ffmpeg e yt-dlp instalados
 
 Publicar no GitHub
 
