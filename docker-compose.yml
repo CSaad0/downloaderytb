@@ -17,20 +17,12 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  caddy:
-    image: caddy:latest
-    container_name: caddy
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
     restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=COLE_SEU_TOKEN_AQUI
     depends_on:
       - youtube-downloader
-
-volumes:
-  caddy_data:
-  caddy_config:
