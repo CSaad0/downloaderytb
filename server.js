@@ -88,7 +88,7 @@ async function downloadAudio(url, isPlaylist = false) {
 
 // Função para obter informações de uma playlist
 async function getPlaylistInfo(url) {
-    const args = [url, '--dump-json', '--flat-playlist'];
+    const args = [url, '--dump-single-json', '--flat-playlist'];
     return new Promise((resolve, reject) => {
         let output = '';
         const proc = spawn('yt-dlp', args, { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -105,8 +105,25 @@ async function getPlaylistInfo(url) {
                     if (jsonStart > 0) {
                         cleanOutput = cleanOutput.substring(jsonStart);
                     }
-                    const data = JSON.parse(cleanOutput);
-                    resolve(data);
+
+                    // Primeiro tenta JSON único
+                    try {
+                        const data = JSON.parse(cleanOutput);
+                        return resolve(data);
+                    } catch (parseErr) {
+                        // Fallback: JSON por linha
+                        const entries = [];
+                        const lines = cleanOutput.split('\n').filter(Boolean);
+                        for (const line of lines) {
+                            try {
+                                entries.push(JSON.parse(line));
+                            } catch {}
+                        }
+                        if (entries.length > 0) {
+                            return resolve({ entries });
+                        }
+                        throw parseErr;
+                    }
                 } catch (e) {
                     reject(new Error('Erro ao fazer parse JSON da playlist'));
                 }
@@ -129,7 +146,22 @@ async function getPlaylistInfo(url) {
                             if (jsonStart > 0) {
                                 cleanOutput = cleanOutput.substring(jsonStart);
                             }
-                            resolve(JSON.parse(cleanOutput));
+
+                            try {
+                                return resolve(JSON.parse(cleanOutput));
+                            } catch (parseErr) {
+                                const entries = [];
+                                const lines = cleanOutput.split('\n').filter(Boolean);
+                                for (const line of lines) {
+                                    try {
+                                        entries.push(JSON.parse(line));
+                                    } catch {}
+                                }
+                                if (entries.length > 0) {
+                                    return resolve({ entries });
+                                }
+                                throw parseErr;
+                            }
                         } catch (e) {
                             reject(new Error('Erro ao fazer parse JSON'));
                         }
