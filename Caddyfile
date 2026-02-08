@@ -1,3 +1,4 @@
-SEU_DOMINIO.com {
+musicas.local {
+    tls internal
     reverse_proxy youtube-downloader:3000
 }
