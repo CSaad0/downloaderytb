@@ -1,4 +1,3 @@
-musicas.local {
-    tls internal
+downloadytb.com.br, www.downloadytb.com.br {
     reverse_proxy youtube-downloader:3000
 }
