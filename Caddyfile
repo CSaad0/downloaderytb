@@ -1,0 +1,3 @@
+SEU_DOMINIO.com {
+    reverse_proxy youtube-downloader:3000
+}
