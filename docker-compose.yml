@@ -23,6 +23,6 @@ services:
     restart: always
     command: tunnel run
     environment:
-      - TUNNEL_TOKEN=COLE_SEU_TOKEN_AQUI
+        - TUNNEL_TOKEN=eyJhIjoiYmY3ZWQxNjMzYTkwOGMxMjYyMDdhZDM5MWY4MGM5N2YiLCJ0IjoiM2M1ODUyZTQtZjE3Zi00MDE0LTk2MTAtYjdjYjk0NGExZGNkIiwicyI6IlkyWXlOV1ppT1RNdFlUTmlOUzAwTWpnMkxUZzNNelV0WWpkaVlUaGxaV00yWW1VNSJ9
     depends_on:
       - youtube-downloader
