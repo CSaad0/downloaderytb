@@ -1,0 +1,39 @@
+crontab: usage error: no arguments permitted after this option
+usage:	crontab [-u user] [-n] file
+	crontab [ -u user ] [ -i ] { -e | -l | -r }
+
+	-h	(displays this help message)
+
+	file	(default operation is replace, per 1003.2)
+	-n	(dry run: checks the syntax, then bails out)
+	-u user	(choose the user whose crontab is touched)
+
+	-e	(edit user's crontab)
+	-l	(list user's crontab)
+	-r	(delete user's crontab)
+
+	-i	(prompt before deleting user's crontab)
+fatal: detected dubious ownership in repository at '/mnt/SERVIDOR/apps/downloaderytb'
+To add an exception for this directory, call:
+
+	git config --global --add safe.directory /mnt/SERVIDOR/apps/downloaderytb
+fatal: detected dubious ownership in repository at '/mnt/SERVIDOR/apps/downloaderytb'
+To add an exception for this directory, call:
+
+	git config --global --add safe.directory /mnt/SERVIDOR/apps/downloaderytb
+fatal: detected dubious ownership in repository at '/mnt/SERVIDOR/apps/downloaderytb'
+To add an exception for this directory, call:
+
+	git config --global --add safe.directory /mnt/SERVIDOR/apps/downloaderytb
+fatal: detected dubious ownership in repository at '/mnt/SERVIDOR/apps/downloaderytb'
+To add an exception for this directory, call:
+
+	git config --global --add safe.directory /mnt/SERVIDOR/apps/downloaderytb
+fatal: detected dubious ownership in repository at '/mnt/SERVIDOR/apps/downloaderytb'
+To add an exception for this directory, call:
+
+	git config --global --add safe.directory /mnt/SERVIDOR/apps/downloaderytb
+fatal: detected dubious ownership in repository at '/mnt/SERVIDOR/apps/downloaderytb'
+To add an exception for this directory, call:
+
+	git config --global --add safe.directory /mnt/SERVIDOR/apps/downloaderytb
