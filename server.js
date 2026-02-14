@@ -342,6 +342,11 @@ app.post('/download', async (req, res) => {
 
                 res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
                 res.setHeader('Content-Type', 'audio/mpeg');
+                res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+                res.setHeader('Pragma', 'no-cache');
+                res.setHeader('Expires', '0');
+
+                const passThrough = new PassThrough();
 
                 ffmpeg(stream)
                     .audioBitrate(128)
@@ -351,6 +356,7 @@ app.post('/download', async (req, res) => {
                     })
                     .on('error', (err) => {
                         console.error('Erro no ffmpeg:', err);
+                        passThrough.destroy();
                         if (!erroRespondido && !res.headersSent) {
                             erroRespondido = true;
                             clearTimeout(timeout);
@@ -360,12 +366,16 @@ app.post('/download', async (req, res) => {
                     })
                     .on('end', () => {
                         console.log('Conversão ffmpeg finalizada.');
+                        passThrough.end();
                         clearTimeout(timeout);
                     })
-                    .pipe(res, { end: true });
+                    .pipe(passThrough, { end: true });
+
+                passThrough.pipe(res, { end: true });
 
                 res.on('close', () => {
                     clearTimeout(timeout);
+                    try { passThrough.destroy(); } catch {}
                     try { stream.destroy(); } catch {}
                 });
 
