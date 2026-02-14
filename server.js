@@ -446,8 +446,17 @@ app.post('/download', async (req, res) => {
 
                         res.setHeader('Content-Disposition', `attachment; filename="${sanitizedTitle}.mp3"`);
                         res.setHeader('Content-Type', 'audio/mpeg');
+                        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
-                        proc.stdout.pipe(res);
+                        const passThrough = new PassThrough();
+                        let dataReceived = false;
+
+                        passThrough.on('data', () => {
+                            dataReceived = true;
+                        });
+
+                        proc.stdout.pipe(passThrough, { end: true });
+                        passThrough.pipe(res, { end: true });
                         proc.stderr.on('data', (d) => console.error('[yt-dlp]', d.toString().trim()));
 
                         proc.on('close', (code) => {
