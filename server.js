@@ -22,7 +22,7 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const archiver = require('archiver');
 const os = require('os');
-const { PassThrough } = require('stream');
+const { PassThrough, Transform } = require('stream');
 const app = express();
 
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -76,6 +76,25 @@ function parseYtDlpPlaylistOutput(rawOutput) {
     }
 
     throw new Error('Nenhum JSON válido encontrado na saída do yt-dlp');
+}
+
+function createHeaderGate(res, headers, onFirstChunk) {
+    let headersSent = false;
+
+    return new Transform({
+        transform(chunk, encoding, callback) {
+            if (!headersSent) {
+                Object.entries(headers).forEach(([key, value]) => {
+                    res.setHeader(key, value);
+                });
+                headersSent = true;
+                if (onFirstChunk) onFirstChunk();
+            }
+
+            this.push(chunk);
+            callback();
+        }
+    });
 }
 
 // CORS para qualquer origem
@@ -340,15 +359,20 @@ app.post('/download', async (req, res) => {
                 const sanitizedTitle = videoTitle.replace(/[<>:"|?*\\/]/g, '').slice(0, 200);
                 const filename = `${sanitizedTitle}.mp3`;
 
-                res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-                res.setHeader('Content-Type', 'audio/mpeg');
-                res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-                res.setHeader('Pragma', 'no-cache');
-                res.setHeader('Expires', '0');
+                const headers = {
+                    'Content-Disposition': `attachment; filename="${filename}"`,
+                    'Content-Type': 'audio/mpeg',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                };
 
-                const passThrough = new PassThrough();
+                let dataSent = false;
+                const headerGate = createHeaderGate(res, headers, () => {
+                    dataSent = true;
+                });
 
-                ffmpeg(stream)
+                const ffmpegCommand = ffmpeg(stream)
                     .audioBitrate(128)
                     .format('mp3')
                     .on('start', (cmd) => {
@@ -356,26 +380,41 @@ app.post('/download', async (req, res) => {
                     })
                     .on('error', (err) => {
                         console.error('Erro no ffmpeg:', err);
-                        passThrough.destroy();
-                        if (!erroRespondido && !res.headersSent) {
+                        headerGate.destroy();
+                        if (!erroRespondido && !res.headersSent && !dataSent) {
                             erroRespondido = true;
                             clearTimeout(timeout);
                             res.status(500).json({ error: 'Erro ao converter para MP3' });
                             res.end();
+                        } else {
+                            res.destroy();
                         }
                     })
                     .on('end', () => {
                         console.log('Conversão ffmpeg finalizada.');
-                        passThrough.end();
                         clearTimeout(timeout);
-                    })
-                    .pipe(passThrough, { end: true });
+                    });
 
-                passThrough.pipe(res, { end: true });
+                stream.on('error', (err) => {
+                    console.error('Erro no stream do YouTube:', err);
+                    headerGate.destroy();
+                    if (!erroRespondido && !res.headersSent && !dataSent) {
+                        erroRespondido = true;
+                        clearTimeout(timeout);
+                        res.status(500).json({ error: 'Erro ao baixar o áudio' });
+                        res.end();
+                    } else {
+                        res.destroy();
+                    }
+                });
+
+                ffmpegCommand.pipe(headerGate, { end: true });
+                headerGate.pipe(res, { end: true });
 
                 res.on('close', () => {
                     clearTimeout(timeout);
-                    try { passThrough.destroy(); } catch {}
+                    try { headerGate.destroy(); } catch {}
+                    try { ffmpegCommand.kill('SIGKILL'); } catch {}
                     try { stream.destroy(); } catch {}
                 });
 
@@ -444,28 +483,34 @@ app.post('/download', async (req, res) => {
                             }
                         });
 
-                        res.setHeader('Content-Disposition', `attachment; filename="${sanitizedTitle}.mp3"`);
-                        res.setHeader('Content-Type', 'audio/mpeg');
-                        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+                        const headers = {
+                            'Content-Disposition': `attachment; filename="${sanitizedTitle}.mp3"`,
+                            'Content-Type': 'audio/mpeg',
+                            'Cache-Control': 'no-cache, no-store, must-revalidate'
+                        };
 
-                        const passThrough = new PassThrough();
-                        let dataReceived = false;
-
-                        passThrough.on('data', () => {
-                            dataReceived = true;
+                        let dataSent = false;
+                        const headerGate = createHeaderGate(res, headers, () => {
+                            dataSent = true;
                         });
 
-                        proc.stdout.pipe(passThrough, { end: true });
-                        passThrough.pipe(res, { end: true });
+                        proc.stdout.pipe(headerGate, { end: true });
+                        headerGate.pipe(res, { end: true });
                         proc.stderr.on('data', (d) => console.error('[yt-dlp]', d.toString().trim()));
 
                         proc.on('close', (code) => {
                             clearTimeout(timeout);
                             console.log('✓ yt-dlp finalizado com código:', code);
+                            if (code !== 0 && !dataSent && !res.headersSent && !erroRespondido) {
+                                erroRespondido = true;
+                                res.status(500).json({ error: 'Erro ao baixar' });
+                                res.end();
+                            }
                         });
 
                         res.on('close', () => { 
                             clearTimeout(timeout);
+                            try { headerGate.destroy(); } catch {}
                             try { proc.kill(); } catch {} 
                         });
                     } catch (fallbackErr) {
