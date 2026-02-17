@@ -23,6 +23,7 @@ const { spawn } = require('child_process');
 const archiver = require('archiver');
 const os = require('os');
 const { PassThrough, Transform } = require('stream');
+const crypto = require('crypto');
 const app = express();
 
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -95,6 +96,17 @@ function createHeaderGate(res, headers, onFirstChunk) {
             callback();
         }
     });
+}
+
+function createTempFilePath(prefix, ext) {
+    const suffix = crypto.randomBytes(6).toString('hex');
+    return path.join(os.tmpdir(), `${prefix}-${Date.now()}-${suffix}.${ext}`);
+}
+
+async function safeUnlink(filePath) {
+    try {
+        await fs.promises.unlink(filePath);
+    } catch {}
 }
 
 // CORS para qualquer origem
@@ -359,63 +371,59 @@ app.post('/download', async (req, res) => {
                 const sanitizedTitle = videoTitle.replace(/[<>:"|?*\\/]/g, '').slice(0, 200);
                 const filename = `${sanitizedTitle}.mp3`;
 
-                const headers = {
-                    'Content-Disposition': `attachment; filename="${filename}"`,
-                    'Content-Type': 'audio/mpeg',
-                    'Cache-Control': 'no-cache, no-store, must-revalidate',
-                    'Pragma': 'no-cache',
-                    'Expires': '0'
-                };
-
-                let dataSent = false;
-                const headerGate = createHeaderGate(res, headers, () => {
-                    dataSent = true;
-                });
+                const outputPath = createTempFilePath('yt-audio', 'mp3');
 
                 const ffmpegCommand = ffmpeg(stream)
                     .audioBitrate(128)
                     .format('mp3')
-                    .on('start', (cmd) => {
+                    .on('start', () => {
                         console.log('Comando ffmpeg iniciado');
                     })
-                    .on('error', (err) => {
+                    .on('error', async (err) => {
                         console.error('Erro no ffmpeg:', err);
-                        headerGate.destroy();
-                        if (!erroRespondido && !res.headersSent && !dataSent) {
+                        if (!erroRespondido && !res.headersSent) {
                             erroRespondido = true;
                             clearTimeout(timeout);
                             res.status(500).json({ error: 'Erro ao converter para MP3' });
                             res.end();
-                        } else {
-                            res.destroy();
                         }
+                        await safeUnlink(outputPath);
                     })
                     .on('end', () => {
                         console.log('Conversão ffmpeg finalizada.');
                         clearTimeout(timeout);
                     });
 
-                stream.on('error', (err) => {
+                stream.on('error', async (err) => {
                     console.error('Erro no stream do YouTube:', err);
-                    headerGate.destroy();
-                    if (!erroRespondido && !res.headersSent && !dataSent) {
+                    if (!erroRespondido && !res.headersSent) {
                         erroRespondido = true;
                         clearTimeout(timeout);
                         res.status(500).json({ error: 'Erro ao baixar o áudio' });
                         res.end();
-                    } else {
-                        res.destroy();
                     }
+                    try { ffmpegCommand.kill('SIGKILL'); } catch {}
+                    await safeUnlink(outputPath);
                 });
 
-                ffmpegCommand.pipe(headerGate, { end: true });
-                headerGate.pipe(res, { end: true });
+                ffmpegCommand.save(outputPath);
 
-                res.on('close', () => {
+                ffmpegCommand.on('end', () => {
+                    res.download(outputPath, filename, async (err) => {
+                        if (err && !res.headersSent && !erroRespondido) {
+                            erroRespondido = true;
+                            res.status(500).json({ error: 'Erro ao enviar o arquivo' });
+                            res.end();
+                        }
+                        await safeUnlink(outputPath);
+                    });
+                });
+
+                res.on('close', async () => {
                     clearTimeout(timeout);
-                    try { headerGate.destroy(); } catch {}
                     try { ffmpegCommand.kill('SIGKILL'); } catch {}
                     try { stream.destroy(); } catch {}
+                    await safeUnlink(outputPath);
                 });
 
             } catch (infoErr) {
@@ -455,7 +463,10 @@ app.post('/download', async (req, res) => {
                         }
                         
                         const sanitizedTitle = videoTitleFromYtdlp.replace(/[<>:"|?*\\/]/g, '').slice(0, 200);
-                        const args = ['-o', '-', '--no-playlist', '--extract-audio', '--audio-format', 'mp3', url];
+                        const tempBase = createTempFilePath('yt-fallback', 'output').replace(/\.output$/, '');
+                        const outputTemplate = `${tempBase}.%(ext)s`;
+                        const outputPath = `${tempBase}.mp3`;
+                        const args = ['-o', outputTemplate, '--no-playlist', '--extract-audio', '--audio-format', 'mp3', url];
                         let proc = spawn('yt-dlp', args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
                         proc.on('error', (spawnErr) => {
@@ -483,35 +494,47 @@ app.post('/download', async (req, res) => {
                             }
                         });
 
-                        const headers = {
-                            'Content-Disposition': `attachment; filename="${sanitizedTitle}.mp3"`,
-                            'Content-Type': 'audio/mpeg',
-                            'Cache-Control': 'no-cache, no-store, must-revalidate'
-                        };
-
                         let dataSent = false;
-                        const headerGate = createHeaderGate(res, headers, () => {
-                            dataSent = true;
-                        });
-
-                        proc.stdout.pipe(headerGate, { end: true });
-                        headerGate.pipe(res, { end: true });
                         proc.stderr.on('data', (d) => console.error('[yt-dlp]', d.toString().trim()));
 
                         proc.on('close', (code) => {
                             clearTimeout(timeout);
                             console.log('✓ yt-dlp finalizado com código:', code);
-                            if (code !== 0 && !dataSent && !res.headersSent && !erroRespondido) {
-                                erroRespondido = true;
-                                res.status(500).json({ error: 'Erro ao baixar' });
-                                res.end();
+                            if (code !== 0) {
+                                if (!erroRespondido && !res.headersSent) {
+                                    erroRespondido = true;
+                                    res.status(500).json({ error: 'Erro ao baixar' });
+                                    res.end();
+                                }
+                                return;
                             }
+
+                            if (!fs.existsSync(outputPath)) {
+                                if (!erroRespondido && !res.headersSent) {
+                                    erroRespondido = true;
+                                    res.status(500).json({ error: 'Arquivo de saída não encontrado' });
+                                    res.end();
+                                }
+                                return;
+                            }
+
+                            res.download(outputPath, `${sanitizedTitle}.mp3`, async (err) => {
+                                if (err && !res.headersSent && !erroRespondido) {
+                                    erroRespondido = true;
+                                    res.status(500).json({ error: 'Erro ao enviar o arquivo' });
+                                    res.end();
+                                }
+                                dataSent = true;
+                                await safeUnlink(outputPath);
+                            });
                         });
 
                         res.on('close', () => { 
                             clearTimeout(timeout);
-                            try { headerGate.destroy(); } catch {}
                             try { proc.kill(); } catch {} 
+                            if (!dataSent) {
+                                safeUnlink(outputPath);
+                            }
                         });
                     } catch (fallbackErr) {
                         console.error('Erro no fallback:', fallbackErr);
