@@ -204,6 +204,9 @@ async function runYtDlp(args) {
                 let output2 = '';
                 proc2.stdout.on('data', (data) => { output2 += data.toString(); });
                 proc2.stderr.on('data', (data) => { console.error('[yt-dlp]', data.toString().trim()); });
+                proc2.on('error', (err2) => {
+                    return reject(err2);
+                });
                 proc2.on('close', (code) => {
                     if (code === 0) return resolve(output2);
                     return reject(new Error('Erro ao obter info da playlist'));
@@ -241,19 +244,30 @@ app.post('/download', async (req, res) => {
         return res.status(400).json({ error: 'URL deve ser do YouTube.' });
     }
 
+    // Verificar se é playlist
+    const isPlaylist = url.includes('list=') || url.includes('playlist');
+    console.log('É playlist?', isPlaylist);
+
     let erroRespondido = false;
+    let clienteDesconectado = false;
+    const timeoutMs = isPlaylist ? 300000 : 60000;
     const timeout = setTimeout(() => {
+        if (clienteDesconectado) {
+            return;
+        }
+
         if (!erroRespondido && !res.headersSent) {
             erroRespondido = true;
             res.status(504).json({ error: 'Tempo excedido ao processar o download.' });
         }
-    }, 300000); // 5 minutos para playlists
+    }, timeoutMs);
+
+    res.on('close', () => {
+        clienteDesconectado = true;
+        clearTimeout(timeout);
+    });
 
     try {
-        // Verificar se é playlist
-        const isPlaylist = url.includes('list=') || url.includes('playlist');
-        console.log('É playlist?', isPlaylist);
-
         if (isPlaylist) {
             // Processar playlist
             try {
@@ -285,12 +299,16 @@ app.post('/download', async (req, res) => {
                     if (!erroRespondido && !res.headersSent) {
                         erroRespondido = true;
                         clearTimeout(timeout);
-                        res.status(500).json({ error: 'Erro ao criar ZIP' });
+                        if (!clienteDesconectado) {
+                            res.status(500).json({ error: 'Erro ao criar ZIP' });
+                        }
                     }
                 });
 
                 res.on('close', () => {
+                    clienteDesconectado = true;
                     clearTimeout(timeout);
+                    try { archive.abort(); } catch {}
                     console.log(`Download do ZIP finalizado. ${filesAdded} arquivos, ${filesError} erros.`);
                 });
 
@@ -301,6 +319,10 @@ app.post('/download', async (req, res) => {
                 let processando = 0;
 
                 const procesarSeguinte = async () => {
+                    if (clienteDesconectado || erroRespondido) {
+                        return;
+                    }
+
                     if (idx >= limitedEntries.length) {
                         if (processando === 0) {
                             archive.finalize();
@@ -325,7 +347,9 @@ app.post('/download', async (req, res) => {
                     }
 
                     processando--;
-                    procesarSeguinte();
+                    if (!clienteDesconectado && !erroRespondido) {
+                        procesarSeguinte();
+                    }
                 };
 
                 // Iniciar 3 downloads em paralelo
@@ -468,70 +492,76 @@ app.post('/download', async (req, res) => {
                         const outputPath = `${tempBase}.mp3`;
                         const args = ['-o', outputTemplate, '--no-playlist', '--extract-audio', '--audio-format', 'mp3', url];
                         let proc = spawn('yt-dlp', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+                        let dataSent = false;
+                        let handled = false;
 
-                        proc.on('error', (spawnErr) => {
-                            console.error('Erro ao iniciar yt-dlp:', spawnErr);
-                            if (spawnErr && spawnErr.code === 'ENOENT') {
-                                console.log('yt-dlp não encontrado, tentando via npx...');
-                                proc = spawn('npx', ['yt-dlp', ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+                        const sendFallbackError = () => {
+                            if (!erroRespondido && !res.headersSent && !clienteDesconectado) {
+                                erroRespondido = true;
+                                clearTimeout(timeout);
+                                res.status(500).json({ error: 'Erro ao baixar' });
+                                res.end();
+                            }
+                        };
 
-                                proc.on('error', (spawnErr2) => {
-                                    console.error('Erro ao iniciar npx yt-dlp:', spawnErr2);
-                                    if (!erroRespondido && !res.headersSent) {
+                        const attachProcessHandlers = (targetProc, isNpx = false) => {
+                            targetProc.stderr.on('data', (d) => console.error('[yt-dlp]', d.toString().trim()));
+
+                            targetProc.on('error', (spawnErr) => {
+                                console.error(isNpx ? 'Erro ao iniciar npx yt-dlp:' : 'Erro ao iniciar yt-dlp:', spawnErr);
+
+                                if (!isNpx && spawnErr && spawnErr.code === 'ENOENT' && !handled) {
+                                    console.log('yt-dlp não encontrado, tentando via npx...');
+                                    proc = spawn('npx', ['yt-dlp', ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+                                    attachProcessHandlers(proc, true);
+                                    return;
+                                }
+
+                                if (!handled) {
+                                    handled = true;
+                                    sendFallbackError();
+                                }
+                            });
+
+                            targetProc.on('close', (code) => {
+                                if (handled) return;
+
+                                clearTimeout(timeout);
+                                console.log('✓ yt-dlp finalizado com código:', code);
+                                if (code !== 0) {
+                                    handled = true;
+                                    sendFallbackError();
+                                    return;
+                                }
+
+                                if (!fs.existsSync(outputPath)) {
+                                    handled = true;
+                                    if (!erroRespondido && !res.headersSent && !clienteDesconectado) {
                                         erroRespondido = true;
-                                        clearTimeout(timeout);
-                                        res.status(500).json({ error: 'Erro ao baixar' });
+                                        res.status(500).json({ error: 'Arquivo de saída não encontrado' });
                                         res.end();
                                     }
+                                    return;
+                                }
+
+                                handled = true;
+                                res.download(outputPath, `${sanitizedTitle}.mp3`, async (err) => {
+                                    if (err && !res.headersSent && !erroRespondido) {
+                                        erroRespondido = true;
+                                        res.status(500).json({ error: 'Erro ao enviar o arquivo' });
+                                        res.end();
+                                    }
+                                    dataSent = true;
+                                    await safeUnlink(outputPath);
                                 });
-                            } else {
-                                if (!erroRespondido && !res.headersSent) {
-                                    erroRespondido = true;
-                                    clearTimeout(timeout);
-                                    res.status(500).json({ error: 'Erro ao baixar' });
-                                    res.end();
-                                }
-                            }
-                        });
-
-                        let dataSent = false;
-                        proc.stderr.on('data', (d) => console.error('[yt-dlp]', d.toString().trim()));
-
-                        proc.on('close', (code) => {
-                            clearTimeout(timeout);
-                            console.log('✓ yt-dlp finalizado com código:', code);
-                            if (code !== 0) {
-                                if (!erroRespondido && !res.headersSent) {
-                                    erroRespondido = true;
-                                    res.status(500).json({ error: 'Erro ao baixar' });
-                                    res.end();
-                                }
-                                return;
-                            }
-
-                            if (!fs.existsSync(outputPath)) {
-                                if (!erroRespondido && !res.headersSent) {
-                                    erroRespondido = true;
-                                    res.status(500).json({ error: 'Arquivo de saída não encontrado' });
-                                    res.end();
-                                }
-                                return;
-                            }
-
-                            res.download(outputPath, `${sanitizedTitle}.mp3`, async (err) => {
-                                if (err && !res.headersSent && !erroRespondido) {
-                                    erroRespondido = true;
-                                    res.status(500).json({ error: 'Erro ao enviar o arquivo' });
-                                    res.end();
-                                }
-                                dataSent = true;
-                                await safeUnlink(outputPath);
                             });
-                        });
+                        };
 
-                        res.on('close', () => { 
+                        attachProcessHandlers(proc, false);
+
+                        res.on('close', () => {
                             clearTimeout(timeout);
-                            try { proc.kill(); } catch {} 
+                            try { proc.kill(); } catch {}
                             if (!dataSent) {
                                 safeUnlink(outputPath);
                             }

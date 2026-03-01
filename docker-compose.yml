@@ -21,8 +21,8 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared
     restart: always
-    command: tunnel run
+    command: tunnel --no-autoupdate run --protocol http2 --edge-ip-version 4
     environment:
-      - TUNNEL_TOKEN=eyJhIjoiYmY3ZWQxNjMzYTkwOGMxMjYyMDdhZDM5MWY4MGM5N2YiLCJ0IjoiM2M1ODUyZTQtZjE3Zi00MDE0LTk2MTAtYjdjYjk0NGExZGNkIiwicyI6IlkyWXlOV1ppT1RNdFlUTmlOUzAwTWpnMkxUZzNNelV0WWpkaVlUaGxaV00yWW1VNSJ9
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
     depends_on:
       - youtube-downloader
