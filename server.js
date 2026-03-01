@@ -179,7 +179,14 @@ async function downloadAudio(url, isPlaylist = false) {
 
 // Função para obter informações de uma playlist
 async function getPlaylistInfo(url) {
-    const baseArgs = ['--flat-playlist', '--no-warnings', '--no-call-home', '--skip-download'];
+    const baseArgs = [
+        '--flat-playlist',
+        '--no-warnings',
+        '--no-call-home',
+        '--skip-download',
+        '--extractor-args', 'youtube:player_client=android',
+        '--force-ipv4'
+    ];
     const primaryArgs = [url, '--dump-single-json', ...baseArgs];
     const fallbackArgs = [url, '--dump-json', ...baseArgs];
 
@@ -496,7 +503,13 @@ app.post('/download', async (req, res) => {
                         
                         try {
                             let infoOutput = '';
-                            const infoProc = spawn('yt-dlp', [url, '--dump-json', '--no-playlist'], { stdio: ['ignore', 'pipe', 'pipe'] });
+                            const infoProc = spawn('yt-dlp', [
+                                url,
+                                '--dump-json',
+                                '--no-playlist',
+                                '--extractor-args', 'youtube:player_client=android',
+                                '--force-ipv4'
+                            ], { stdio: ['ignore', 'pipe', 'pipe'] });
                             infoProc.stdout.on('data', (data) => { infoOutput += data.toString(); });
                             
                             await new Promise((resolve) => {
@@ -524,7 +537,16 @@ app.post('/download', async (req, res) => {
                         const tempBase = createTempFilePath('yt-fallback', 'output').replace(/\.output$/, '');
                         const outputTemplate = `${tempBase}.%(ext)s`;
                         const outputPath = `${tempBase}.mp3`;
-                        const args = ['-o', outputTemplate, '--no-playlist', '--extract-audio', '--audio-format', 'mp3', url];
+                        const args = [
+                            '-o', outputTemplate,
+                            '--no-playlist',
+                            '-f', 'bestaudio[ext=m4a]/bestaudio/best',
+                            '--extractor-args', 'youtube:player_client=android',
+                            '--force-ipv4',
+                            '--extract-audio',
+                            '--audio-format', 'mp3',
+                            url
+                        ];
                         let proc = spawn('yt-dlp', args, { stdio: ['ignore', 'pipe', 'pipe'] });
                         let dataSent = false;
                         let handled = false;
