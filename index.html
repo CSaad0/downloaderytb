@@ -233,6 +233,11 @@
                 }
                 mensagem.textContent = '⬇️ Baixando áudio...';
                 const blob = await response.blob();
+                if (!blob || blob.size === 0) {
+                    mensagem.className = 'mensagem-erro';
+                    mensagem.textContent = 'O servidor retornou um arquivo vazio. Tente novamente.';
+                    return;
+                }
                 const link = document.createElement('a');
                 link.href = window.URL.createObjectURL(blob);
                 

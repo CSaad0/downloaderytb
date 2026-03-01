@@ -109,6 +109,15 @@ async function safeUnlink(filePath) {
     } catch {}
 }
 
+async function getFileSize(filePath) {
+    try {
+        const stat = await fs.promises.stat(filePath);
+        return stat.size;
+    } catch {
+        return 0;
+    }
+}
+
 // CORS para qualquer origem
 app.use(cors({ origin: '*' }));
 app.use(express.json());
@@ -250,7 +259,7 @@ app.post('/download', async (req, res) => {
 
     let erroRespondido = false;
     let clienteDesconectado = false;
-    const timeoutMs = isPlaylist ? 300000 : 60000;
+    const timeoutMs = isPlaylist ? 300000 : 180000;
     const timeout = setTimeout(() => {
         if (clienteDesconectado) {
             return;
@@ -396,6 +405,8 @@ app.post('/download', async (req, res) => {
                 const filename = `${sanitizedTitle}.mp3`;
 
                 const outputPath = createTempFilePath('yt-audio', 'mp3');
+                let downloadConcluido = false;
+                let processamentoFinalizado = false;
 
                 const ffmpegCommand = ffmpeg(stream)
                     .audioBitrate(128)
@@ -432,12 +443,32 @@ app.post('/download', async (req, res) => {
 
                 ffmpegCommand.save(outputPath);
 
-                ffmpegCommand.on('end', () => {
+                ffmpegCommand.on('end', async () => {
+                    if (processamentoFinalizado || clienteDesconectado) {
+                        await safeUnlink(outputPath);
+                        return;
+                    }
+
+                    const fileSize = await getFileSize(outputPath);
+                    if (fileSize <= 0) {
+                        processamentoFinalizado = true;
+                        await safeUnlink(outputPath);
+                        if (!erroRespondido && !res.headersSent && !clienteDesconectado) {
+                            erroRespondido = true;
+                            res.status(500).json({ error: 'Arquivo MP3 vazio após conversão. Tente novamente.' });
+                        }
+                        return;
+                    }
+
                     res.download(outputPath, filename, async (err) => {
+                        processamentoFinalizado = true;
                         if (err && !res.headersSent && !erroRespondido) {
                             erroRespondido = true;
                             res.status(500).json({ error: 'Erro ao enviar o arquivo' });
                             res.end();
+                        }
+                        if (!err) {
+                            downloadConcluido = true;
                         }
                         await safeUnlink(outputPath);
                     });
@@ -445,6 +476,9 @@ app.post('/download', async (req, res) => {
 
                 res.on('close', async () => {
                     clearTimeout(timeout);
+                    if (downloadConcluido || res.writableEnded) {
+                        return;
+                    }
                     try { ffmpegCommand.kill('SIGKILL'); } catch {}
                     try { stream.destroy(); } catch {}
                     await safeUnlink(outputPath);
